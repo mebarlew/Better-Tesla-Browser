@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>Launcher</title>
+    <style>
+      :root {
+        --bg: #08090c;
+        --panel: rgba(255, 255, 255, 0.04);
+        --panel-brd: rgba(255, 255, 255, 0.08);
+        --ink: #f4f5f8;
+        --dim: #8b90a0;
+        --accent: #6c5ce7;
+        --tile: 168px;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        height: 100%;
+        background:
+          radial-gradient(
+            1200px 700px at 15% -10%,
+            #18122b 0%,
+            transparent 55%
+          ),
+          radial-gradient(
+            1100px 700px at 90% 110%,
+            #0a2233 0%,
+            transparent 55%
+          ),
+          var(--bg);
+        background-attachment: fixed;
+        color: var(--ink);
+        font-family:
+          -apple-system, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 2100px;
+        margin: 0 auto;
+        padding: 44px 60px 100px;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      .clock {
+        font-size: 76px;
+        font-weight: 700;
+        letter-spacing: -2px;
+        line-height: 1;
+      }
+      .greet {
+        font-size: 20px;
+        color: var(--dim);
+        margin-top: 10px;
+        font-weight: 500;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .search {
+        margin-top: 34px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--panel);
+        border: 1px solid var(--panel-brd);
+        border-radius: 999px;
+        padding: 8px 8px 8px 26px;
+        backdrop-filter: blur(8px);
+        transition: border-color 0.2s ease;
+      }
+      .search:focus-within {
+        border-color: var(--accent);
+      }
+      .search-ico {
+        font-size: 28px;
+        color: var(--dim);
+        line-height: 1;
+      }
+      .search input {
+        flex: 1;
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--ink);
+        font-size: 22px;
+        font-weight: 500;
+        padding: 14px 0;
+      }
+      .search input::placeholder {
+        color: var(--dim);
+      }
+      .search .go {
+        padding: 14px 30px;
+        font-size: 18px;
+      }
+      .btn {
+        border: 1px solid var(--panel-brd);
+        background: var(--panel);
+        color: var(--ink);
+        font-size: 17px;
+        font-weight: 600;
+        padding: 14px 24px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          transform 0.1s ease,
+          background 0.2s ease;
+        backdrop-filter: blur(8px);
+      }
+      .btn:active {
+        transform: scale(0.95);
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: transparent;
+        box-shadow: 0 10px 30px -10px var(--accent);
+      }
+      .btn.on {
+        background: #fff;
+        color: #111;
+        border-color: transparent;
+      }
+      .btn.tip {
+        background: rgba(255, 199, 44, 0.14);
+        border-color: rgba(255, 199, 44, 0.4);
+        color: #ffd666;
+      }
+
+      .tip-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 24px 0 4px;
+      }
+      .tip-buttons a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 24px;
+        border-radius: 16px;
+        text-decoration: none;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 700;
+        background: var(--c, var(--accent));
+        box-shadow: 0 10px 26px -12px var(--c, var(--accent));
+        transition: transform 0.1s ease;
+      }
+      .tip-buttons a:active {
+        transform: scale(0.96);
+      }
+      .tip-empty {
+        color: var(--dim);
+        font-size: 16px;
+        margin: 20px 0 4px;
+      }
+      .tip-form {
+        margin-top: 20px;
+      }
+      .tip-form.hidden {
+        display: none;
+      }
+      .tip-field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin-bottom: 14px;
+      }
+      .tip-field span {
+        font-size: 14px;
+        color: var(--dim);
+        font-weight: 600;
+      }
+      .tip-field input {
+        background: #191c24;
+        border: 1px solid var(--panel-brd);
+        color: var(--ink);
+        padding: 14px 16px;
+        border-radius: 14px;
+        font-size: 17px;
+        outline: none;
+      }
+      .tip-field input:focus {
+        border-color: var(--accent);
+      }
+      .tip-edit {
+        margin-top: 18px;
+      }
+      .tip-edit.hidden {
+        display: none;
+      }
+
+      .grid {
+        margin-top: 44px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
+        gap: 20px;
+      }
+      .tile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        height: var(--tile);
+        border-radius: 26px;
+        background: var(--panel);
+        border: 1px solid var(--panel-brd);
+        text-decoration: none;
+        color: var(--ink);
+        overflow: hidden;
+        transition:
+          transform 0.12s ease,
+          background 0.2s ease;
+        backdrop-filter: blur(8px);
+      }
+      .tile:active {
+        transform: scale(0.955);
+        background: rgba(255, 255, 255, 0.09);
+      }
+      .tile .glow {
+        position: absolute;
+        inset: 0;
+        opacity: 0.16;
+        pointer-events: none;
+        background: radial-gradient(
+          120px 120px at 50% 32%,
+          var(--c, var(--accent)),
+          transparent 70%
+        );
+      }
+      .badge {
+        width: 74px;
+        height: 74px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        font-weight: 800;
+        background: var(--c, var(--accent));
+        color: #fff;
+        overflow: hidden;
+        box-shadow: 0 10px 26px -10px var(--c, var(--accent));
+      }
+      .badge img {
+        width: 46px;
+        height: 46px;
+        display: block;
+        border-radius: 8px;
+      }
+      .name {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.2px;
+      }
+
+      .add-tile {
+        border-style: dashed;
+        border-color: rgba(255, 255, 255, 0.16);
+        background: transparent;
+        cursor: pointer;
+      }
+      .add-tile .plus {
+        font-size: 46px;
+        color: var(--dim);
+        font-weight: 300;
+        line-height: 1;
+      }
+      .add-tile .name {
+        color: var(--dim);
+      }
+
+      .remove {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: #ff3b46;
+        color: #fff;
+        border: none;
+        font-size: 20px;
+        font-weight: 700;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+        line-height: 1;
+      }
+      body.editing .remove {
+        display: flex;
+      }
+      body.editing .tile {
+        animation: wiggle 0.3s ease-in-out infinite alternate;
+      }
+      body.editing .add-tile {
+        animation: none;
+      }
+      @keyframes wiggle {
+        from {
+          transform: rotate(-0.6deg);
+        }
+        to {
+          transform: rotate(0.6deg);
+        }
+      }
+
+      /* overlay */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(4, 5, 8, 0.72);
+        backdrop-filter: blur(10px);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 60px 24px;
+        z-index: 50;
+        overflow-y: auto;
+      }
+      .overlay.open {
+        display: flex;
+      }
+      .sheet {
+        width: 100%;
+        max-width: 1000px;
+        background: #101218;
+        border: 1px solid var(--panel-brd);
+        border-radius: 30px;
+        padding: 34px 34px 40px;
+      }
+      .sheet h2 {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+      }
+      .sheet .lead {
+        color: var(--dim);
+        margin-top: 6px;
+        font-size: 16px;
+      }
+      .sheet .close {
+        float: right;
+      }
+
+      .custom {
+        display: flex;
+        gap: 12px;
+        margin: 26px 0 8px;
+        flex-wrap: wrap;
+      }
+      .custom input {
+        flex: 1;
+        min-width: 200px;
+        background: #191c24;
+        border: 1px solid var(--panel-brd);
+        color: var(--ink);
+        padding: 15px 18px;
+        border-radius: 16px;
+        font-size: 17px;
+        outline: none;
+      }
+      .custom input:focus {
+        border-color: var(--accent);
+      }
+
+      .cat-label {
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--dim);
+        margin: 26px 0 12px;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 16px 11px 12px;
+        border-radius: 999px;
+        background: #191c24;
+        border: 1px solid var(--panel-brd);
+        color: var(--ink);
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          transform 0.1s ease,
+          background 0.2s ease;
+      }
+      .chip:active {
+        transform: scale(0.95);
+      }
+      .chip.added {
+        background: rgba(108, 92, 231, 0.22);
+        border-color: var(--accent);
+      }
+      .chip .ico {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--c, var(--accent));
+        color: #fff;
+        font-size: 14px;
+        font-weight: 800;
+        overflow: hidden;
+      }
+      .chip .ico img {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+      }
+      .chip .tick {
+        color: var(--accent);
+        font-weight: 800;
+      }
+
+      @media (max-width: 900px) {
+        :root {
+          --tile: 132px;
+        }
+        .wrap {
+          padding: 28px 22px 80px;
+        }
+        .clock {
+          font-size: 52px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <div class="clock" id="clock">--:--</div>
+          <div class="greet" id="greet">Ready when you are</div>
+        </div>
+        <div class="actions">
+          <button class="btn tip" id="tipBtn">☕ Tip</button>
+          <button class="btn" id="editBtn">Edit</button>
+          <button class="btn primary" id="addBtn">+ Add</button>
+        </div>
+      </header>
+
+      <form class="search" id="search">
+        <span class="search-ico">⌕</span>
+        <input
+          id="q"
+          placeholder="Search the web or type a website…"
+          inputmode="search"
+          autocomplete="off"
+          autocorrect="off"
+        />
+        <button type="submit" class="btn primary go">Go</button>
+      </form>
+
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="sheet">
+        <button class="btn close" id="closeBtn">Done</button>
+        <h2>Add a shortcut</h2>
+        <div class="lead">
+          Tap a suggestion, or paste any website below. Everything saves on this
+          device.
+        </div>
+
+        <div class="custom">
+          <input id="cName" placeholder="Name (e.g. My Site)" />
+          <input id="cUrl" placeholder="https://…" inputmode="url" />
+          <button class="btn primary" id="cAdd">Add</button>
+        </div>
+
+        <div id="catalog"></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="tipOverlay">
+      <div class="sheet tip-sheet">
+        <button class="btn close" id="tipClose">Done</button>
+        <h2 id="tipTitle">Leave a tip ☕</h2>
+        <div class="lead" id="tipLead">
+          If this page saves you time, you can throw a little something my way.
+        </div>
+
+        <div id="tipButtons" class="tip-buttons"></div>
+
+        <form id="tipForm" class="tip-form">
+          <div class="cat-label">Your tip links — paste the ones you have</div>
+          <label class="tip-field"
+            ><span>PayPal.me</span>
+            <input id="tPaypal" placeholder="paypal.me/yourname or full link"
+          /></label>
+          <label class="tip-field"
+            ><span>Buy Me a Coffee</span>
+            <input id="tBmac" placeholder="buymeacoffee.com/yourname"
+          /></label>
+          <label class="tip-field"
+            ><span>Ko-fi</span>
+            <input id="tKofi" placeholder="ko-fi.com/yourname"
+          /></label>
+          <label class="tip-field"
+            ><span>Stripe / custom link</span>
+            <input id="tCustom" placeholder="https://…"
+          /></label>
+          <label class="tip-field"
+            ><span>Message shown to visitors</span>
+            <input id="tNote" placeholder="Thanks for stopping by!"
+          /></label>
+          <button type="submit" class="btn primary" id="tipSave">
+            Save tip jar
+          </button>
+        </form>
+
+        <button class="btn tip-edit" id="tipEdit">Edit tip links</button>
+      </div>
+    </div>
+
+    <script>
+      // ---- popular catalog: grouped suggestions ----
+      const CATALOG = {
+        Streaming: [
+          ["YouTube", "https://www.youtube.com", "#ff0000"],
+          ["Netflix", "https://www.netflix.com", "#e50914"],
+          ["Disney+", "https://www.disneyplus.com", "#113ccf"],
+          ["Prime Video", "https://www.primevideo.com", "#00a8e1"],
+          ["Max", "https://www.max.com", "#4b2ec9"],
+          ["Apple TV", "https://tv.apple.com", "#111111"],
+          ["Hulu", "https://www.hulu.com", "#1ce783"],
+          ["Twitch", "https://www.twitch.tv", "#9146ff"],
+          ["Plex", "https://app.plex.tv", "#e5a00d"],
+          ["Paramount+", "https://www.paramountplus.com", "#0064ff"],
+        ],
+        Music: [
+          ["Spotify", "https://open.spotify.com", "#1db954"],
+          ["Apple Music", "https://music.apple.com", "#fa2c56"],
+          ["YouTube Music", "https://music.youtube.com", "#ff0000"],
+          ["SoundCloud", "https://soundcloud.com", "#ff5500"],
+          ["Tidal", "https://listen.tidal.com", "#111111"],
+        ],
+        Navigation: [
+          ["Google Maps", "https://www.google.com/maps", "#34a853"],
+          ["Waze", "https://www.waze.com/live-map", "#33ccff"],
+          [
+            "A Better Route Planner",
+            "https://abetterrouteplanner.com",
+            "#2b6cff",
+          ],
+          ["PlugShare", "https://www.plugshare.com", "#00c37a"],
+          ["Tesla Supercharger", "https://www.tesla.com/findus", "#e31937"],
+        ],
+        Productivity: [
+          ["Gmail", "https://mail.google.com", "#ea4335"],
+          ["Google Calendar", "https://calendar.google.com", "#4285f4"],
+          ["Google Drive", "https://drive.google.com", "#ffba00"],
+          ["Notion", "https://www.notion.so", "#111111"],
+          ["Outlook", "https://outlook.live.com", "#0072c6"],
+        ],
+        AI: [
+          ["ChatGPT", "https://chatgpt.com", "#10a37f"],
+          ["Claude", "https://claude.ai", "#d97757"],
+          ["Gemini", "https://gemini.google.com", "#4285f4"],
+          ["Perplexity", "https://www.perplexity.ai", "#20b8cd"],
+        ],
+        Social: [
+          ["WhatsApp", "https://web.whatsapp.com", "#25d366"],
+          ["X", "https://x.com", "#111111"],
+          ["Instagram", "https://www.instagram.com", "#e1306c"],
+          ["Reddit", "https://www.reddit.com", "#ff4500"],
+          ["Telegram", "https://web.telegram.org", "#2aabee"],
+          ["Discord", "https://discord.com/app", "#5865f2"],
+        ],
+        "News & Info": [
+          ["Google News", "https://news.google.com", "#5c6bc0"],
+          ["Weather", "https://weather.com", "#5aa9e6"],
+          ["BBC", "https://www.bbc.com/news", "#bb1919"],
+          ["Wikipedia", "https://www.wikipedia.org", "#111111"],
+        ],
+        "Food & Coffee": [
+          ["Starbucks", "https://www.starbucks.com", "#00704a"],
+          ["McDonald's", "https://www.mcdonalds.com", "#ffc72c"],
+          ["Uber Eats", "https://www.ubereats.com", "#06c167"],
+          ["DoorDash", "https://www.doordash.com", "#ff3008"],
+          ["Lieferando", "https://www.lieferando.de", "#ff8000"],
+          ["Wolt", "https://wolt.com", "#00c2e8"],
+          ["Yelp", "https://www.yelp.com", "#ff1a1a"],
+          ["Costa", "https://www.costa.co.uk", "#6c1f45"],
+          ["Dunkin'", "https://www.dunkindonuts.com", "#ff671f"],
+          ["Tim Hortons", "https://www.timhortons.com", "#c8102e"],
+        ],
+        Shopping: [
+          ["Amazon", "https://www.amazon.com", "#ff9900"],
+          ["eBay", "https://www.ebay.com", "#e53238"],
+        ],
+      };
+
+      const DEFAULTS = [
+        ["Google Maps", "https://www.google.com/maps", "#34a853"],
+        ["Spotify", "https://open.spotify.com", "#1db954"],
+        ["YouTube", "https://www.youtube.com", "#ff0000"],
+        ["Netflix", "https://www.netflix.com", "#e50914"],
+        ["ChatGPT", "https://chatgpt.com", "#10a37f"],
+        ["Gmail", "https://mail.google.com", "#ea4335"],
+      ];
+
+      const KEY = "launcher.tiles.v1";
+      const SEEDED = "launcher.seeded.v1";
+
+      function load() {
+        try {
+          return JSON.parse(localStorage.getItem(KEY)) || null;
+        } catch {
+          return null;
+        }
+      }
+      function save(list) {
+        localStorage.setItem(KEY, JSON.stringify(list));
+      }
+
+      let tiles = load();
+      if (!tiles) {
+        tiles = DEFAULTS.map(([name, url, c]) => ({ name, url, c }));
+        save(tiles);
+      }
+
+      function host(url) {
+        try {
+          return new URL(url).hostname;
+        } catch {
+          return "";
+        }
+      }
+      function favicon(url) {
+        return (
+          "https://www.google.com/s2/favicons?domain=" + host(url) + "&sz=128"
+        );
+      }
+
+      function badgeHTML(item) {
+        const letter = (item.name[0] || "?").toUpperCase();
+        return (
+          '<span class="badge" style="--c:' +
+          (item.c || "#6c5ce7") +
+          '">' +
+          '<img src="' +
+          favicon(item.url) +
+          '" alt="" ' +
+          "onerror=\"this.replaceWith(document.createTextNode('" +
+          letter +
+          "'))\" /></span>"
+        );
+      }
+
+      const grid = document.getElementById("grid");
+
+      function render() {
+        grid.innerHTML = "";
+        tiles.forEach((item, i) => {
+          const a = document.createElement("a");
+          a.className = "tile";
+          a.href = item.url;
+          a.style.setProperty("--c", item.c || "#6c5ce7");
+          a.innerHTML =
+            '<button class="remove" data-i="' +
+            i +
+            '" aria-label="Remove">×</button>' +
+            '<span class="glow"></span>' +
+            badgeHTML(item) +
+            '<span class="name">' +
+            item.name +
+            "</span>";
+          a.addEventListener("click", (e) => {
+            if (document.body.classList.contains("editing")) e.preventDefault();
+          });
+          grid.appendChild(a);
+        });
+        const add = document.createElement("button");
+        add.className = "tile add-tile";
+        add.innerHTML =
+          '<span class="plus">+</span><span class="name">Add</span>';
+        add.addEventListener("click", openSheet);
+        grid.appendChild(add);
+      }
+
+      grid.addEventListener("click", (e) => {
+        const rm = e.target.closest(".remove");
+        if (!rm) return;
+        e.preventDefault();
+        tiles.splice(Number(rm.dataset.i), 1);
+        save(tiles);
+        render();
+        buildCatalog();
+      });
+
+      function hasUrl(url) {
+        return tiles.some((t) => t.url === url);
+      }
+      function addTile(name, url, c) {
+        if (!name || !url) return;
+        if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+        if (hasUrl(url)) return;
+        tiles.push({ name, url, c: c || "#6c5ce7" });
+        save(tiles);
+        render();
+      }
+
+      // ---- add sheet ----
+      const overlay = document.getElementById("overlay");
+      const catalogEl = document.getElementById("catalog");
+
+      function buildCatalog() {
+        catalogEl.innerHTML = "";
+        for (const [cat, items] of Object.entries(CATALOG)) {
+          const label = document.createElement("div");
+          label.className = "cat-label";
+          label.textContent = cat;
+          const chips = document.createElement("div");
+          chips.className = "chips";
+          items.forEach(([name, url, c]) => {
+            const added = hasUrl(url);
+            const chip = document.createElement("button");
+            chip.className = "chip" + (added ? " added" : "");
+            chip.innerHTML =
+              '<span class="ico" style="--c:' +
+              c +
+              '"><img src="' +
+              favicon(url) +
+              '" alt="" ' +
+              "onerror=\"this.replaceWith(document.createTextNode('" +
+              name[0] +
+              "'))\" /></span>" +
+              "<span>" +
+              name +
+              "</span>" +
+              (added ? '<span class="tick">✓</span>' : "");
+            chip.addEventListener("click", () => {
+              if (hasUrl(url)) {
+                tiles = tiles.filter((t) => t.url !== url);
+                save(tiles);
+                render();
+              } else {
+                addTile(name, url, c);
+              }
+              buildCatalog();
+            });
+            chips.appendChild(chip);
+          });
+          catalogEl.appendChild(label);
+          catalogEl.appendChild(chips);
+        }
+      }
+
+      function openSheet() {
+        buildCatalog();
+        overlay.classList.add("open");
+      }
+      function closeSheet() {
+        overlay.classList.remove("open");
+      }
+
+      document.getElementById("addBtn").addEventListener("click", openSheet);
+      document.getElementById("closeBtn").addEventListener("click", closeSheet);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeSheet();
+      });
+
+      document.getElementById("cAdd").addEventListener("click", () => {
+        const n = document.getElementById("cName");
+        const u = document.getElementById("cUrl");
+        addTile(n.value.trim(), u.value.trim());
+        n.value = "";
+        u.value = "";
+        buildCatalog();
+      });
+
+      const editBtn = document.getElementById("editBtn");
+      editBtn.addEventListener("click", () => {
+        const on = document.body.classList.toggle("editing");
+        editBtn.textContent = on ? "Done" : "Edit";
+        editBtn.classList.toggle("on", on);
+      });
+
+      // ---- tip jar ----
+      const TIP_KEY = "launcher.tip.v1";
+      const tipOverlay = document.getElementById("tipOverlay");
+      const tipButtons = document.getElementById("tipButtons");
+      const tipForm = document.getElementById("tipForm");
+      const tipEdit = document.getElementById("tipEdit");
+
+      const TIP_PROVIDERS = [
+        [
+          "tPaypal",
+          "PayPal",
+          "#0070ba",
+          (v) =>
+            /^https?:\/\//i.test(v)
+              ? v
+              : "https://paypal.me/" + v.replace(/^.*paypal\.me\//i, ""),
+        ],
+        [
+          "tBmac",
+          "Buy Me a Coffee",
+          "#ffdd00",
+          (v) =>
+            /^https?:\/\//i.test(v) ? v : "https://" + v.replace(/^\/+/, ""),
+        ],
+        [
+          "tKofi",
+          "Ko-fi",
+          "#ff5e5b",
+          (v) =>
+            /^https?:\/\//i.test(v) ? v : "https://" + v.replace(/^\/+/, ""),
+        ],
+        [
+          "tCustom",
+          "Tip",
+          "#6c5ce7",
+          (v) => (/^https?:\/\//i.test(v) ? v : "https://" + v),
+        ],
+      ];
+
+      function loadTip() {
+        try {
+          return JSON.parse(localStorage.getItem(TIP_KEY)) || {};
+        } catch {
+          return {};
+        }
+      }
+      function saveTip(cfg) {
+        localStorage.setItem(TIP_KEY, JSON.stringify(cfg));
+      }
+
+      function renderTip() {
+        const cfg = loadTip();
+        const links = TIP_PROVIDERS.filter(([k]) => cfg[k]);
+        tipButtons.innerHTML = "";
+        document.getElementById("tipLead").textContent =
+          cfg.tNote ||
+          "If this page saves you time, you can throw a little something my way.";
+
+        if (links.length) {
+          links.forEach(([k, label, c, toUrl]) => {
+            const a = document.createElement("a");
+            a.href = toUrl(cfg[k].trim());
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.style.setProperty("--c", c);
+            a.textContent = label;
+            tipButtons.appendChild(a);
+          });
+          tipForm.classList.add("hidden");
+          tipEdit.classList.remove("hidden");
+        } else {
+          const p = document.createElement("div");
+          p.className = "tip-empty";
+          p.textContent =
+            "No tip link set yet. Add one below so visitors can support you.";
+          tipButtons.appendChild(p);
+          tipForm.classList.remove("hidden");
+          tipEdit.classList.add("hidden");
+        }
+        // hydrate form fields
+        TIP_PROVIDERS.forEach(([k]) => {
+          document.getElementById(k).value = cfg[k] || "";
+        });
+        document.getElementById("tNote").value = cfg.tNote || "";
+      }
+
+      function openTip() {
+        renderTip();
+        tipOverlay.classList.add("open");
+      }
+      function closeTip() {
+        tipOverlay.classList.remove("open");
+      }
+
+      document.getElementById("tipBtn").addEventListener("click", openTip);
+      document.getElementById("tipClose").addEventListener("click", closeTip);
+      tipOverlay.addEventListener("click", (e) => {
+        if (e.target === tipOverlay) closeTip();
+      });
+      tipEdit.addEventListener("click", () => {
+        tipForm.classList.remove("hidden");
+        tipEdit.classList.add("hidden");
+      });
+      tipForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const cfg = {};
+        TIP_PROVIDERS.forEach(([k]) => {
+          const v = document.getElementById(k).value.trim();
+          if (v) cfg[k] = v;
+        });
+        const note = document.getElementById("tNote").value.trim();
+        if (note) cfg.tNote = note;
+        saveTip(cfg);
+        renderTip();
+      });
+
+      // ---- search / address bar ----
+      document.getElementById("search").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const raw = document.getElementById("q").value.trim();
+        if (!raw) return;
+        const looksLikeUrl =
+          /^https?:\/\//i.test(raw) ||
+          (/^[^\s]+\.[a-z]{2,}(\/\S*)?$/i.test(raw) && !/\s/.test(raw));
+        const dest = looksLikeUrl
+          ? /^https?:\/\//i.test(raw)
+            ? raw
+            : "https://" + raw
+          : "https://www.google.com/search?q=" + encodeURIComponent(raw);
+        window.location.href = dest;
+      });
+
+      // ---- clock ----
+      function tick() {
+        const now = new Date();
+        document.getElementById("clock").textContent =
+          String(now.getHours()).padStart(2, "0") +
+          ":" +
+          String(now.getMinutes()).padStart(2, "0");
+        const h = now.getHours();
+        const g =
+          h < 6
+            ? "Late night drive"
+            : h < 12
+              ? "Good morning"
+              : h < 18
+                ? "Good afternoon"
+                : "Good evening";
+        const d = now.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        });
+        document.getElementById("greet").textContent = g + " · " + d;
+      }
+      tick();
+      setInterval(tick, 10000);
+
+      render();
+    </script>
+  </body>
+</html>
