@@ -56,6 +56,66 @@
         align-items: flex-start;
         justify-content: space-between;
         gap: 24px;
+        flex-wrap: wrap;
+      }
+      .weather {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 22px;
+        border-radius: 22px;
+        background: var(--panel);
+        border: 1px solid var(--panel-brd);
+        backdrop-filter: blur(8px);
+        text-decoration: none;
+        color: var(--ink);
+        margin-left: auto;
+        transition: transform 0.1s ease;
+      }
+      .weather:active {
+        transform: scale(0.97);
+      }
+      .w-icon {
+        font-size: 44px;
+        line-height: 1;
+      }
+      .w-main {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .w-temp {
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        line-height: 1;
+      }
+      .w-cond {
+        font-size: 14px;
+        color: var(--dim);
+        font-weight: 500;
+      }
+      .w-side {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        align-items: flex-end;
+        border-left: 1px solid var(--panel-brd);
+        padding-left: 16px;
+      }
+      .w-side:empty {
+        display: none;
+      }
+      .w-city {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .w-hilo {
+        font-size: 13px;
+        color: var(--dim);
+      }
+      .weather.err .w-side {
+        display: none;
       }
       .clock {
         font-size: 76px;
@@ -465,6 +525,22 @@
           <div class="clock" id="clock">--:--</div>
           <div class="greet" id="greet">Ready when you are</div>
         </div>
+        <a
+          class="weather"
+          id="weather"
+          href="https://www.google.com/search?q=weather"
+          title="Weather"
+        >
+          <span class="w-icon" id="wIcon">·</span>
+          <span class="w-main">
+            <span class="w-temp" id="wTemp">—</span>
+            <span class="w-cond" id="wCond">Loading weather…</span>
+          </span>
+          <span class="w-side">
+            <span class="w-city" id="wCity"></span>
+            <span class="w-hilo" id="wHilo"></span>
+          </span>
+        </a>
         <div class="actions">
           <button class="btn tip" id="tipBtn">☕ Tip</button>
           <button class="btn" id="editBtn">Edit</button>
@@ -968,6 +1044,124 @@
       }
       tick();
       setInterval(tick, 10000);
+
+      // ---- weather (Open-Meteo, no key) ----
+      const WMO = {
+        0: ["☀️", "Clear"],
+        1: ["🌤️", "Mostly clear"],
+        2: ["⛅", "Partly cloudy"],
+        3: ["☁️", "Overcast"],
+        45: ["🌫️", "Fog"],
+        48: ["🌫️", "Rime fog"],
+        51: ["🌦️", "Light drizzle"],
+        53: ["🌦️", "Drizzle"],
+        55: ["🌧️", "Heavy drizzle"],
+        61: ["🌦️", "Light rain"],
+        63: ["🌧️", "Rain"],
+        65: ["🌧️", "Heavy rain"],
+        66: ["🌨️", "Freezing rain"],
+        67: ["🌨️", "Freezing rain"],
+        71: ["🌨️", "Light snow"],
+        73: ["❄️", "Snow"],
+        75: ["❄️", "Heavy snow"],
+        77: ["🌨️", "Snow grains"],
+        80: ["🌦️", "Showers"],
+        81: ["🌧️", "Showers"],
+        82: ["⛈️", "Heavy showers"],
+        85: ["🌨️", "Snow showers"],
+        86: ["❄️", "Snow showers"],
+        95: ["⛈️", "Thunderstorm"],
+        96: ["⛈️", "Thunderstorm"],
+        99: ["⛈️", "Hailstorm"],
+      };
+      const WEATHER_LOC = "launcher.loc.v1";
+
+      function paintWeather(w) {
+        const [icon, label] = WMO[w.code] || ["🌡️", "—"];
+        document.getElementById("wIcon").textContent = icon;
+        document.getElementById("wTemp").textContent = Math.round(w.temp) + "°";
+        document.getElementById("wCond").textContent = label;
+        document.getElementById("wCity").textContent = w.city || "";
+        document.getElementById("wHilo").textContent =
+          w.hi != null
+            ? "H " + Math.round(w.hi) + "°  L " + Math.round(w.lo) + "°"
+            : "";
+      }
+      function weatherError() {
+        document.getElementById("weather").classList.add("err");
+        document.getElementById("wIcon").textContent = "🌡️";
+        document.getElementById("wTemp").textContent = "";
+        document.getElementById("wCond").textContent = "Weather unavailable";
+      }
+
+      async function fetchWeather(lat, lon, city) {
+        try {
+          const u =
+            "https://api.open-meteo.com/v1/forecast?latitude=" +
+            lat +
+            "&longitude=" +
+            lon +
+            "&current=temperature_2m,weather_code" +
+            "&daily=temperature_2m_max,temperature_2m_min&timezone=auto";
+          const r = await fetch(u);
+          if (!r.ok) throw new Error("weather http " + r.status);
+          const d = await r.json();
+          paintWeather({
+            temp: d.current.temperature_2m,
+            code: d.current.weather_code,
+            hi: d.daily.temperature_2m_max[0],
+            lo: d.daily.temperature_2m_min[0],
+            city,
+          });
+        } catch (e) {
+          weatherError();
+        }
+      }
+
+      async function cityName(lat, lon) {
+        try {
+          const r = await fetch(
+            "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" +
+              lat +
+              "&longitude=" +
+              lon +
+              "&localityLanguage=en",
+          );
+          const d = await r.json();
+          return d.city || d.locality || d.principalSubdivision || "";
+        } catch {
+          return "";
+        }
+      }
+
+      async function loadWeatherAt(lat, lon) {
+        localStorage.setItem(WEATHER_LOC, JSON.stringify({ lat, lon }));
+        const city = await cityName(lat, lon);
+        fetchWeather(lat, lon, city);
+      }
+
+      function initWeather() {
+        // fall back to last-known location instantly, then refine via GPS
+        const cached = JSON.parse(localStorage.getItem(WEATHER_LOC) || "null");
+        if (cached) loadWeatherAt(cached.lat, cached.lon);
+
+        if (!navigator.geolocation) {
+          if (!cached) loadWeatherAt(52.34, 14.55); // Frankfurt (Oder) default
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => loadWeatherAt(pos.coords.latitude, pos.coords.longitude),
+          () => {
+            if (!cached) loadWeatherAt(52.34, 14.55);
+          },
+          { timeout: 8000, maximumAge: 600000 },
+        );
+      }
+      initWeather();
+      setInterval(() => {
+        const c = JSON.parse(localStorage.getItem(WEATHER_LOC) || "null");
+        if (c) loadWeatherAt(c.lat, c.lon);
+      }, 900000); // refresh every 15 min
 
       render();
     </script>
