@@ -542,6 +542,7 @@
           </span>
         </a>
         <div class="actions">
+          <button class="btn" id="fsBtn">⛶ Fullscreen</button>
           <button class="btn tip" id="tipBtn">☕ Tip</button>
           <button class="btn" id="editBtn">Edit</button>
           <button class="btn primary" id="addBtn">+ Add</button>
@@ -885,6 +886,15 @@
         const on = document.body.classList.toggle("editing");
         editBtn.textContent = on ? "Done" : "Edit";
         editBtn.classList.toggle("on", on);
+      });
+
+      // ---- fullscreen ----
+      // Tesla's browser ignores the Fullscreen API, but its YouTube "theater"
+      // window is fullscreen and youtube.com/redirect loads any site inside it.
+      document.getElementById("fsBtn").addEventListener("click", () => {
+        window.location.href =
+          "https://www.youtube.com/redirect?q=" +
+          encodeURIComponent(window.location.href);
       });
 
       // ---- tip jar ----
