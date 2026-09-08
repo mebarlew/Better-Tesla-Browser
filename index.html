@@ -263,8 +263,37 @@
         display: none;
       }
 
+      .section {
+        margin-top: 40px;
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .section-head .cat-label {
+        margin: 0;
+      }
+      .cat-remove {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        background: #ff3b46;
+        color: #fff;
+        border: none;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+      body.editing .cat-remove {
+        display: flex;
+      }
       .grid {
-        margin-top: 44px;
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
         gap: 20px;
@@ -471,6 +500,9 @@
       .custom input:focus {
         border-color: var(--accent);
       }
+      .new-cat[hidden] {
+        display: none;
+      }
 
       .cat-label {
         font-size: 13px;
@@ -585,7 +617,7 @@
         <button type="submit" class="btn primary go">Go</button>
       </form>
 
-      <div class="grid" id="grid"></div>
+      <div id="sections"></div>
     </div>
 
     <button class="tipjar" id="tipBtn" aria-label="Tip jar" title="Tip jar">
@@ -601,6 +633,13 @@
           device.
         </div>
 
+        <div class="cat-label">Category</div>
+        <div class="chips" id="catPick"></div>
+        <div class="custom new-cat" id="newCatRow" hidden>
+          <input id="newCat" placeholder="New category (e.g. Road trip)" />
+          <button class="btn" id="newCatAdd">Create</button>
+        </div>
+
         <div class="custom">
           <input id="cName" placeholder="Name (e.g. My Site)" />
           <input id="cUrl" placeholder="https://…" inputmode="url" />
@@ -608,6 +647,16 @@
         </div>
 
         <div id="catalog"></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="moveOverlay">
+      <div class="sheet">
+        <button class="btn close" id="moveClose">Cancel</button>
+        <h2 id="moveTitle">Move</h2>
+        <div class="lead">Pick a category for this shortcut.</div>
+        <div class="cat-label">Category</div>
+        <div class="chips" id="moveChips"></div>
       </div>
     </div>
 
@@ -740,6 +789,7 @@
       ];
 
       const KEY = "launcher.tiles.v1";
+      const CATS_KEY = "launcher.cats.v1";
       const SEEDED = "launcher.seeded.v1";
 
       function load() {
@@ -758,6 +808,18 @@
         tiles = DEFAULTS.map(([name, url, c]) => ({ name, url, c }));
         save(tiles);
       }
+
+      function loadCats() {
+        try {
+          return JSON.parse(localStorage.getItem(CATS_KEY)) || [];
+        } catch {
+          return [];
+        }
+      }
+      function saveCats() {
+        localStorage.setItem(CATS_KEY, JSON.stringify(cats));
+      }
+      let cats = loadCats();
 
       function host(url) {
         try {
@@ -787,11 +849,16 @@
         );
       }
 
-      const grid = document.getElementById("grid");
+      const sections = document.getElementById("sections");
 
-      function render() {
-        grid.innerHTML = "";
-        tiles.forEach((item, i) => {
+      function catOf(t) {
+        return t.cat && cats.includes(t.cat) ? t.cat : "";
+      }
+
+      function makeGrid(items, cat) {
+        const g = document.createElement("div");
+        g.className = "grid";
+        items.forEach(([item, i]) => {
           const a = document.createElement("a");
           a.className = "tile";
           a.href = item.url;
@@ -806,19 +873,58 @@
             item.name +
             "</span>";
           a.addEventListener("click", (e) => {
-            if (document.body.classList.contains("editing")) e.preventDefault();
+            if (!document.body.classList.contains("editing")) return;
+            e.preventDefault();
+            if (!e.target.closest(".remove")) openMove(i);
           });
-          grid.appendChild(a);
+          g.appendChild(a);
         });
         const add = document.createElement("button");
         add.className = "tile add-tile";
         add.innerHTML =
           '<span class="plus">+</span><span class="name">Add</span>';
-        add.addEventListener("click", openSheet);
-        grid.appendChild(add);
+        add.addEventListener("click", () => openSheet(cat));
+        g.appendChild(add);
+        return g;
       }
 
-      grid.addEventListener("click", (e) => {
+      function render() {
+        sections.innerHTML = "";
+        const indexed = tiles.map((t, i) => [t, i]);
+        const loose = indexed.filter(([t]) => !catOf(t));
+        if (loose.length || !cats.length) {
+          const s = document.createElement("section");
+          s.className = "section";
+          s.appendChild(makeGrid(loose, ""));
+          sections.appendChild(s);
+        }
+        cats.forEach((cat) => {
+          const s = document.createElement("section");
+          s.className = "section";
+          s.innerHTML =
+            '<div class="section-head"><span class="cat-label"></span>' +
+            '<button class="cat-remove" aria-label="Remove category">×</button></div>';
+          s.querySelector(".cat-label").textContent = cat;
+          s.querySelector(".cat-remove").addEventListener("click", () => {
+            cats = cats.filter((c) => c !== cat);
+            tiles.forEach((t) => {
+              if (t.cat === cat) delete t.cat;
+            });
+            saveCats();
+            save(tiles);
+            render();
+          });
+          s.appendChild(
+            makeGrid(
+              indexed.filter(([t]) => catOf(t) === cat),
+              cat,
+            ),
+          );
+          sections.appendChild(s);
+        });
+      }
+
+      sections.addEventListener("click", (e) => {
         const rm = e.target.closest(".remove");
         if (!rm) return;
         e.preventDefault();
@@ -835,10 +941,41 @@
         if (!name || !url) return;
         if (!/^https?:\/\//i.test(url)) url = "https://" + url;
         if (hasUrl(url)) return;
-        tiles.push({ name, url, c: c || "#6c5ce7" });
+        const t = { name, url, c: c || "#6c5ce7" };
+        if (sheetCat) t.cat = sheetCat;
+        tiles.push(t);
         save(tiles);
         render();
       }
+
+      // ---- move sheet (edit mode: tap a tile) ----
+      const moveOverlay = document.getElementById("moveOverlay");
+      function openMove(i) {
+        const t = tiles[i];
+        document.getElementById("moveTitle").textContent = "Move " + t.name;
+        const chips = document.getElementById("moveChips");
+        chips.innerHTML = "";
+        ["", ...cats].forEach((cat) => {
+          const chip = document.createElement("button");
+          chip.className = "chip" + (catOf(t) === cat ? " added" : "");
+          chip.textContent = cat || "No category";
+          chip.addEventListener("click", () => {
+            if (cat) t.cat = cat;
+            else delete t.cat;
+            save(tiles);
+            render();
+            moveOverlay.classList.remove("open");
+          });
+          chips.appendChild(chip);
+        });
+        moveOverlay.classList.add("open");
+      }
+      document.getElementById("moveClose").addEventListener("click", () => {
+        moveOverlay.classList.remove("open");
+      });
+      moveOverlay.addEventListener("click", (e) => {
+        if (e.target === moveOverlay) moveOverlay.classList.remove("open");
+      });
 
       // ---- add sheet ----
       const overlay = document.getElementById("overlay");
@@ -886,7 +1023,49 @@
         }
       }
 
-      function openSheet() {
+      let sheetCat = "";
+      const catPick = document.getElementById("catPick");
+      const newCatRow = document.getElementById("newCatRow");
+
+      function buildCatPick() {
+        catPick.innerHTML = "";
+        ["", ...cats].forEach((cat) => {
+          const chip = document.createElement("button");
+          chip.className = "chip" + (sheetCat === cat ? " added" : "");
+          chip.textContent = cat || "No category";
+          chip.addEventListener("click", () => {
+            sheetCat = cat;
+            buildCatPick();
+          });
+          catPick.appendChild(chip);
+        });
+        const plus = document.createElement("button");
+        plus.className = "chip";
+        plus.textContent = "+ New";
+        plus.addEventListener("click", () => {
+          newCatRow.hidden = false;
+          document.getElementById("newCat").focus();
+        });
+        catPick.appendChild(plus);
+      }
+
+      document.getElementById("newCatAdd").addEventListener("click", () => {
+        const inp = document.getElementById("newCat");
+        const name = inp.value.trim();
+        if (!name || cats.includes(name)) return;
+        cats.push(name);
+        saveCats();
+        sheetCat = name;
+        inp.value = "";
+        newCatRow.hidden = true;
+        buildCatPick();
+        render();
+      });
+
+      function openSheet(cat) {
+        sheetCat = cat;
+        newCatRow.hidden = true;
+        buildCatPick();
         buildCatalog();
         overlay.classList.add("open");
       }
@@ -894,7 +1073,9 @@
         overlay.classList.remove("open");
       }
 
-      document.getElementById("addBtn").addEventListener("click", openSheet);
+      document.getElementById("addBtn").addEventListener("click", () => {
+        openSheet("");
+      });
       document.getElementById("closeBtn").addEventListener("click", closeSheet);
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) closeSheet();
