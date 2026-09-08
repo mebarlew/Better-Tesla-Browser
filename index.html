@@ -568,7 +568,7 @@
     <div class="wrap">
       <header>
         <div class="actions" data-w="actions">
-          <button class="btn" id="chargeBtn">⚡ Chargers nearby</button>
+          <button class="btn" id="chargeBtn">⚡ Chargers in ABRP</button>
           <button class="btn" id="editBtn">Edit</button>
           <button class="btn primary" id="addBtn">+ Add</button>
         </div>
@@ -1362,21 +1362,21 @@
         if (c) loadWeatherAt(c.lat, c.lon);
       }, 900000); // refresh every 15 min
 
-      // ---- nearby chargers: Google Maps search around the car ----
-      // ABRP's deep link can only centre its map, so Maps it is: it lists the
-      // nearest stations with distances.
-      const CHARGERS =
-        "https://www.google.com/maps/search/EV+charging+station/";
+      // ---- nearby chargers: ABRP centred on the car ----
+      // ABRP has no URL that opens its Nearby panel (query, hash and path
+      // routes were all tried); lat/lon only centres the map, then the
+      // lightning button in ABRP's corner opens the nearby list.
+      const ABRP = "https://abetterrouteplanner.com/";
       document.getElementById("chargeBtn").addEventListener("click", () => {
         const go = (lat, lon) => {
-          window.location.href = CHARGERS + "@" + lat + "," + lon + ",14z";
+          window.location.href = ABRP + "?lat=" + lat + "&lon=" + lon;
         };
         const cached = JSON.parse(localStorage.getItem(WEATHER_LOC) || "null");
         if (cached) return go(cached.lat, cached.lon);
-        if (!navigator.geolocation) return (window.location.href = CHARGERS);
+        if (!navigator.geolocation) return (window.location.href = ABRP);
         navigator.geolocation.getCurrentPosition(
           (pos) => go(pos.coords.latitude, pos.coords.longitude),
-          () => (window.location.href = CHARGERS),
+          () => (window.location.href = ABRP),
           { timeout: 8000, maximumAge: 600000 },
         );
       });
