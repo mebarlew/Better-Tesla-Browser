@@ -232,16 +232,22 @@
       body.editing .section.cat > .section-head {
         cursor: grab;
       }
-      .section.drop {
-        outline: 2px dashed var(--accent);
-        outline-offset: 10px;
+      .section.loose.empty {
+        display: none;
+      }
+      body.editing .section.loose.empty {
+        display: block;
       }
       body.editing .section.loose {
         padding: 22px;
         border: 1px dashed rgba(255, 255, 255, 0.16);
       }
       .custom.loose-form {
+        display: none;
         margin: 0 0 16px;
+      }
+      body.editing .custom.loose-form {
+        display: flex;
       }
       #sections .tile,
       .section-head,
@@ -253,12 +259,8 @@
         opacity: 0.35;
       }
       body.editing .ghost {
-        position: fixed;
-        margin: 0;
-        z-index: 40;
-        pointer-events: none;
         animation: none;
-        transition: none;
+        opacity: 0.95;
         box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
       }
       .section-head {
@@ -288,10 +290,18 @@
       body.editing .cat-remove {
         display: flex;
       }
+      .tiles,
       .grid {
         display: flex;
         flex-wrap: wrap;
+        align-items: flex-start;
         gap: 20px;
+      }
+      body.editing .grid.empty {
+        min-width: var(--tile);
+        min-height: var(--tile);
+        border-radius: 26px;
+        border: 1px dashed rgba(255, 255, 255, 0.12);
       }
       .tile {
         position: relative;
@@ -558,7 +568,7 @@
     <div class="wrap">
       <header>
         <div class="actions" data-w="actions">
-          <button class="btn" id="chargeBtn">⚡ Chargers in ABRP</button>
+          <button class="btn" id="chargeBtn">⚡ Chargers nearby</button>
           <button class="btn" id="editBtn">Edit</button>
           <button class="btn primary" id="addBtn">+ Add</button>
         </div>
@@ -636,6 +646,7 @@
       </div>
     </div>
 
+    <script src="sortable.min.js"></script>
     <script>
       // ---- popular catalog: grouped suggestions ----
       const CATALOG = {
@@ -791,8 +802,10 @@
       }
 
       function makeGrid(items, cat) {
+        const wrap = document.createElement("div");
+        wrap.className = "tiles";
         const g = document.createElement("div");
-        g.className = "grid";
+        g.className = "grid" + (items.length ? "" : " empty");
         items.forEach(([item, i]) => {
           const a = document.createElement("a");
           a.className = "tile";
@@ -809,7 +822,10 @@
             item.name +
             "</span>";
           a.addEventListener("click", (e) => {
-            if (document.body.classList.contains("editing")) e.preventDefault();
+            if (!document.body.classList.contains("editing")) return;
+            e.preventDefault();
+            if (performance.now() - armedAt < 600) return;
+            if (!e.target.closest(".remove")) openMove(i);
           });
           g.appendChild(a);
         });
@@ -818,39 +834,35 @@
         add.innerHTML =
           '<span class="plus">+</span><span class="name">Add</span>';
         add.addEventListener("click", () => openSheet(cat));
-        g.appendChild(add);
-        return g;
+        wrap.appendChild(g);
+        wrap.appendChild(add);
+        return wrap;
       }
 
       function render() {
         sections.innerHTML = "";
         const indexed = tiles.map((t, i) => [t, i]);
         const loose = indexed.filter(([t]) => !catOf(t));
-        const editing = document.body.classList.contains("editing");
-        if (loose.length || editing) {
-          const top = document.createElement("section");
-          top.className = "section loose";
-          top.dataset.cat = "";
-          if (editing) {
-            const form = document.createElement("form");
-            form.className = "custom loose-form";
-            form.innerHTML =
-              '<input placeholder="' +
-              (loose.length ? "Name this block…" : "New category name…") +
-              '" /><button type="submit" class="btn primary">Create</button>';
-            form.addEventListener("submit", (e) => {
-              e.preventDefault();
-              const name = form.querySelector("input").value.trim();
-              if (!createCat(name)) return;
-              loose.forEach(([t]) => (t.cat = name));
-              save(tiles);
-              render();
-            });
-            top.appendChild(form);
-          }
-          top.appendChild(makeGrid(loose, ""));
-          sections.appendChild(top);
-        }
+        const top = document.createElement("section");
+        top.className = "section loose" + (loose.length ? "" : " empty");
+        top.dataset.cat = "";
+        const form = document.createElement("form");
+        form.className = "custom loose-form";
+        form.innerHTML =
+          '<input placeholder="' +
+          (loose.length ? "Name this block…" : "New category name…") +
+          '" /><button type="submit" class="btn primary">Create</button>';
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const name = form.querySelector("input").value.trim();
+          if (!createCat(name)) return;
+          loose.forEach(([t]) => (t.cat = name));
+          save(tiles);
+          render();
+        });
+        top.appendChild(form);
+        top.appendChild(makeGrid(loose, ""));
+        sections.appendChild(top);
         cats.forEach((cat) => {
           const s = document.createElement("section");
           s.className = "section cat";
@@ -876,6 +888,7 @@
           );
           sections.appendChild(s);
         });
+        initSortables();
       }
 
       sections.addEventListener("click", (e) => {
@@ -889,13 +902,13 @@
       });
 
       // ---- press-and-hold to move tiles, blocks and header widgets ----
-      // Pointer events instead of the HTML5 drag API: Chromium on touch
-      // screens (the car) does not fire drag events reliably. Outside edit
-      // mode a hold arms the drag; moving early cancels it so flicks scroll.
+      // SortableJS (vendored) animates neighbours out of the way and handles
+      // touch. Outside edit mode a hold arms the drag and turns edit mode on.
       const HOLD_MS = 350;
       const HEADER_KEY = "launcher.header.v1";
       const header = document.querySelector("header");
-      let drag = null;
+      let gridSortables = [];
+      let armedAt = -1e9;
       let swallowClicksUntil = 0;
 
       function saveHeader() {
@@ -918,42 +931,15 @@
         });
       })();
 
-      function dragTargetFrom(target) {
-        if (target.closest(".remove, .cat-remove, input")) return null;
-        const tile = target.closest("#sections .tile:not(.add-tile)");
-        if (tile) return { el: tile, kind: "tile" };
-        const head = target.closest("#sections .section.cat > .section-head");
-        if (head) return { el: head.parentNode, kind: "block" };
-        const w = target.closest("header > [data-w]");
-        if (w) return { el: w, kind: "widget" };
-        return null;
-      }
-
-      function refindDragEl(d) {
-        if (d.kind === "tile") {
-          return sections.querySelector('.tile[data-i="' + d.key + '"]');
-        }
-        if (d.kind === "block") {
-          return [...sections.querySelectorAll(".section.cat")].find(
-            (s) => s.dataset.cat === d.key,
-          );
-        }
-        return d.el;
-      }
-
       document.addEventListener("dragstart", (e) => {
-        if (dragTargetFrom(e.target)) e.preventDefault();
+        if (e.target.closest("#sections, header")) e.preventDefault();
       });
       document.addEventListener("contextmenu", (e) => {
-        if (dragTargetFrom(e.target)) e.preventDefault();
+        if (
+          e.target.closest("#sections .tile, .section-head, header > [data-w]")
+        )
+          e.preventDefault();
       });
-      document.addEventListener(
-        "touchmove",
-        (e) => {
-          if (drag && drag.armed) e.preventDefault();
-        },
-        { passive: false },
-      );
       document.addEventListener(
         "click",
         (e) => {
@@ -964,150 +950,82 @@
         true,
       );
 
-      document.addEventListener("pointerdown", (e) => {
-        const t = dragTargetFrom(e.target);
-        if (!t) return;
-        const editing = document.body.classList.contains("editing");
-        drag = {
-          el: t.el,
-          kind: t.kind,
-          key: t.kind === "tile" ? t.el.dataset.i : t.el.dataset.cat,
-          id: e.pointerId,
-          x: e.clientX,
-          y: e.clientY,
-          ghost: null,
-          armed: editing,
-          wasEditing: editing,
-          timer: 0,
-        };
-        if (editing) {
-          e.preventDefault();
-          return;
-        }
-        drag.timer = setTimeout(() => {
-          if (!drag) return;
-          drag.armed = true;
+      const sortableBase = {
+        animation: 150,
+        easing: "cubic-bezier(0.2, 0, 0, 1)",
+        delay: HOLD_MS,
+        delayOnTouchOnly: false,
+        touchStartThreshold: 8,
+        forceFallback: true,
+        fallbackOnBody: true,
+        fallbackTolerance: 6,
+        ghostClass: "placeholder",
+        fallbackClass: "ghost",
+        onChoose() {
+          if (document.body.classList.contains("editing")) return;
+          armedAt = performance.now();
           setEditing(true);
-          drag.el = refindDragEl(drag);
-        }, HOLD_MS);
-      });
-
-      function clearDrop() {
-        sections
-          .querySelectorAll(".section.drop")
-          .forEach((s) => s.classList.remove("drop"));
+        },
+      };
+      function dropped() {
+        swallowClicksUntil = performance.now() + 400;
       }
 
-      window.addEventListener("pointermove", (e) => {
-        if (!drag || e.pointerId !== drag.id) return;
-        const dx = e.clientX - drag.x;
-        const dy = e.clientY - drag.y;
-        if (!drag.armed) {
-          if (Math.hypot(dx, dy) >= 10) {
-            clearTimeout(drag.timer);
-            drag = null;
-          }
-          return;
-        }
-        if (!drag.ghost) {
-          if (Math.hypot(dx, dy) < 10) return;
-          const r = drag.el.getBoundingClientRect();
-          const g = drag.el.cloneNode(true);
-          g.classList.add("ghost");
-          g.style.left = r.left + "px";
-          g.style.top = r.top + "px";
-          g.style.width = r.width + "px";
-          g.style.height = r.height + "px";
-          document.body.appendChild(g);
-          drag.ghost = g;
-          drag.el.classList.add("placeholder");
-        }
-        drag.ghost.style.transform =
-          "translate(" +
-          dx +
-          "px," +
-          dy +
-          "px) scale(" +
-          (drag.kind === "tile" ? 1.06 : 1.02) +
-          ")";
-
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        clearDrop();
-        if (!el) return;
-
-        if (drag.kind === "widget") {
-          const over = el.closest("header > [data-w]");
-          if (!over || over === drag.el) return;
-          const r = over.getBoundingClientRect();
-          const before = e.clientX < r.left + r.width / 2;
-          header.insertBefore(drag.el, before ? over : over.nextSibling);
-          return;
-        }
-
-        if (drag.kind === "block") {
-          const over = el.closest("#sections .section.cat");
-          if (!over || over === drag.el) return;
-          const r = over.getBoundingClientRect();
-          const before = e.clientX < r.left + r.width / 2;
-          sections.insertBefore(drag.el, before ? over : over.nextSibling);
-          return;
-        }
-
-        const sec = el.closest("#sections .section");
-        if (!sec) return;
-        sec.classList.add("drop");
-        const grid = sec.querySelector(".grid");
-        const over = el.closest(".tile:not(.add-tile)");
-        if (over && over !== drag.el) {
-          const r = over.getBoundingClientRect();
-          const before = e.clientX < r.left + r.width / 2;
-          grid.insertBefore(drag.el, before ? over : over.nextSibling);
-        } else if (!over && drag.el.parentNode !== grid) {
-          grid.insertBefore(drag.el, grid.querySelector(".add-tile"));
-        }
-      });
-
-      function endDrag(e) {
-        if (!drag || e.pointerId !== drag.id) return;
-        const d = drag;
-        drag = null;
-        clearTimeout(d.timer);
-        clearDrop();
-        if (!d.ghost) {
-          if (d.kind === "tile" && d.wasEditing && e.type === "pointerup")
-            openMove(Number(d.el.dataset.i));
-          return;
-        }
-        swallowClicksUntil = performance.now() + 400;
-        d.ghost.remove();
-        d.el.classList.remove("placeholder");
-        if (d.kind === "widget") {
+      const headerSortable = new Sortable(header, {
+        ...sortableBase,
+        onEnd() {
+          dropped();
           saveHeader();
-          return;
-        }
-        if (d.kind === "block") {
+        },
+      });
+      const blockSortable = new Sortable(sections, {
+        ...sortableBase,
+        draggable: ".section.cat",
+        handle: ".section-head",
+        filter: ".cat-remove",
+        preventOnFilter: false,
+        onEnd() {
+          dropped();
           cats = [...sections.querySelectorAll(".section.cat")].map(
             (s) => s.dataset.cat,
           );
           saveCats();
-          render();
-          return;
-        }
-        const order = [];
-        sections.querySelectorAll(".section").forEach((s) => {
-          s.querySelectorAll(".tile:not(.add-tile)").forEach((el) => {
-            const t = tiles[Number(el.dataset.i)];
-            if (s.dataset.cat) t.cat = s.dataset.cat;
-            else delete t.cat;
-            order.push(t);
-          });
-        });
-        tiles = order;
-        save(tiles);
-        render();
+        },
+      });
+      function allSortables() {
+        return [headerSortable, blockSortable, ...gridSortables];
       }
-      window.addEventListener("pointerup", endDrag);
-      window.addEventListener("pointercancel", endDrag);
+
+      function initSortables() {
+        gridSortables.forEach((s) => s.destroy());
+        const delay = document.body.classList.contains("editing") ? 0 : HOLD_MS;
+        gridSortables = [...sections.querySelectorAll(".grid")].map(
+          (g) =>
+            new Sortable(g, {
+              ...sortableBase,
+              delay,
+              group: "tiles",
+              draggable: ".tile:not(.add-tile)",
+              filter: ".remove, .add-tile",
+              preventOnFilter: false,
+              onEnd() {
+                dropped();
+                const order = [];
+                sections.querySelectorAll(".section").forEach((s) => {
+                  s.querySelectorAll(".tile:not(.add-tile)").forEach((el) => {
+                    const t = tiles[Number(el.dataset.i)];
+                    if (s.dataset.cat) t.cat = s.dataset.cat;
+                    else delete t.cat;
+                    order.push(t);
+                  });
+                });
+                tiles = order;
+                save(tiles);
+                setTimeout(render, 0);
+              },
+            }),
+        );
+      }
 
       function hasUrl(url) {
         return tiles.some((t) => t.url === url);
@@ -1275,7 +1193,7 @@
         document.body.classList.toggle("editing", on);
         editBtn.textContent = on ? "Done" : "Edit";
         editBtn.classList.toggle("on", on);
-        render();
+        allSortables().forEach((s) => s.option("delay", on ? 0 : HOLD_MS));
       }
       editBtn.addEventListener("click", () => {
         setEditing(!document.body.classList.contains("editing"));
@@ -1444,19 +1362,21 @@
         if (c) loadWeatherAt(c.lat, c.lon);
       }, 900000); // refresh every 15 min
 
-      // ---- nearby chargers: open ABRP centred on the car ----
-      // ABRP's deep link only centres the map; it cannot start navigation.
-      const ABRP = "https://abetterrouteplanner.com/";
+      // ---- nearby chargers: Google Maps search around the car ----
+      // ABRP's deep link can only centre its map, so Maps it is: it lists the
+      // nearest stations with distances.
+      const CHARGERS =
+        "https://www.google.com/maps/search/EV+charging+station/";
       document.getElementById("chargeBtn").addEventListener("click", () => {
         const go = (lat, lon) => {
-          window.location.href = ABRP + "?lat=" + lat + "&lon=" + lon;
+          window.location.href = CHARGERS + "@" + lat + "," + lon + ",14z";
         };
         const cached = JSON.parse(localStorage.getItem(WEATHER_LOC) || "null");
         if (cached) return go(cached.lat, cached.lon);
-        if (!navigator.geolocation) return (window.location.href = ABRP);
+        if (!navigator.geolocation) return (window.location.href = CHARGERS);
         navigator.geolocation.getCurrentPosition(
           (pos) => go(pos.coords.latitude, pos.coords.longitude),
-          () => (window.location.href = ABRP),
+          () => (window.location.href = CHARGERS),
           { timeout: 8000, maximumAge: 600000 },
         );
       });
