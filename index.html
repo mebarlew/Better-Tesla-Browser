@@ -223,46 +223,6 @@
       .tip-buttons a:active {
         transform: scale(0.96);
       }
-      .tip-empty {
-        color: var(--dim);
-        font-size: 16px;
-        margin: 20px 0 4px;
-      }
-      .tip-form {
-        margin-top: 20px;
-      }
-      .tip-form.hidden {
-        display: none;
-      }
-      .tip-field {
-        display: flex;
-        flex-direction: column;
-        gap: 7px;
-        margin-bottom: 14px;
-      }
-      .tip-field span {
-        font-size: 14px;
-        color: var(--dim);
-        font-weight: 600;
-      }
-      .tip-field input {
-        background: #191c24;
-        border: 1px solid var(--panel-brd);
-        color: var(--ink);
-        padding: 14px 16px;
-        border-radius: 14px;
-        font-size: 17px;
-        outline: none;
-      }
-      .tip-field input:focus {
-        border-color: var(--accent);
-      }
-      .tip-edit {
-        margin-top: 18px;
-      }
-      .tip-edit.hidden {
-        display: none;
-      }
 
       .section {
         margin-top: 40px;
@@ -478,6 +438,9 @@
       }
       .tipjar:active {
         transform: scale(0.92);
+      }
+      .tipjar[hidden] {
+        display: none;
       }
 
       /* overlay */
@@ -699,43 +662,13 @@
     </div>
 
     <div class="overlay" id="tipOverlay">
-      <div class="sheet tip-sheet">
+      <div class="sheet">
         <button class="btn close" id="tipClose">Done</button>
-        <h2 id="tipTitle">Leave a tip ☕</h2>
-        <div class="lead" id="tipLead">
+        <h2>Leave a tip ☕</h2>
+        <div class="lead">
           If this page saves you time, you can throw a little something my way.
         </div>
-
         <div id="tipButtons" class="tip-buttons"></div>
-
-        <form id="tipForm" class="tip-form">
-          <div class="cat-label">Your tip links — paste the ones you have</div>
-          <label class="tip-field"
-            ><span>PayPal.me</span>
-            <input id="tPaypal" placeholder="paypal.me/yourname or full link"
-          /></label>
-          <label class="tip-field"
-            ><span>Buy Me a Coffee</span>
-            <input id="tBmac" placeholder="buymeacoffee.com/yourname"
-          /></label>
-          <label class="tip-field"
-            ><span>Ko-fi</span>
-            <input id="tKofi" placeholder="ko-fi.com/yourname"
-          /></label>
-          <label class="tip-field"
-            ><span>Stripe / custom link</span>
-            <input id="tCustom" placeholder="https://…"
-          /></label>
-          <label class="tip-field"
-            ><span>Message shown to visitors</span>
-            <input id="tNote" placeholder="Thanks for stopping by!"
-          /></label>
-          <button type="submit" class="btn primary" id="tipSave">
-            Save tip jar
-          </button>
-        </form>
-
-        <button class="btn tip-edit" id="tipEdit">Edit tip links</button>
       </div>
     </div>
 
@@ -1251,119 +1184,30 @@
       });
 
       // ---- tip jar ----
-      const TIP_KEY = "launcher.tip.v1";
+      // Hardcoded on purpose: visitors see this page, so the links have to be
+      // the author's, not something each visitor fills in for themselves.
+      const TIP_LINKS = [];
       const tipOverlay = document.getElementById("tipOverlay");
+      const tipBtn = document.getElementById("tipBtn");
       const tipButtons = document.getElementById("tipButtons");
-      const tipForm = document.getElementById("tipForm");
-      const tipEdit = document.getElementById("tipEdit");
 
-      const TIP_PROVIDERS = [
-        [
-          "tPaypal",
-          "PayPal",
-          "#0070ba",
-          (v) =>
-            /^https?:\/\//i.test(v)
-              ? v
-              : "https://paypal.me/" + v.replace(/^.*paypal\.me\//i, ""),
-        ],
-        [
-          "tBmac",
-          "Buy Me a Coffee",
-          "#ffdd00",
-          (v) =>
-            /^https?:\/\//i.test(v) ? v : "https://" + v.replace(/^\/+/, ""),
-        ],
-        [
-          "tKofi",
-          "Ko-fi",
-          "#ff5e5b",
-          (v) =>
-            /^https?:\/\//i.test(v) ? v : "https://" + v.replace(/^\/+/, ""),
-        ],
-        [
-          "tCustom",
-          "Tip",
-          "#6c5ce7",
-          (v) => (/^https?:\/\//i.test(v) ? v : "https://" + v),
-        ],
-      ];
+      TIP_LINKS.forEach(([label, url, c]) => {
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.style.setProperty("--c", c);
+        a.textContent = label;
+        tipButtons.appendChild(a);
+      });
+      tipBtn.hidden = !TIP_LINKS.length;
 
-      function loadTip() {
-        try {
-          return JSON.parse(localStorage.getItem(TIP_KEY)) || {};
-        } catch {
-          return {};
-        }
-      }
-      function saveTip(cfg) {
-        localStorage.setItem(TIP_KEY, JSON.stringify(cfg));
-      }
-
-      function renderTip() {
-        const cfg = loadTip();
-        const links = TIP_PROVIDERS.filter(([k]) => cfg[k]);
-        tipButtons.innerHTML = "";
-        document.getElementById("tipLead").textContent =
-          cfg.tNote ||
-          "If this page saves you time, you can throw a little something my way.";
-
-        if (links.length) {
-          links.forEach(([k, label, c, toUrl]) => {
-            const a = document.createElement("a");
-            a.href = toUrl(cfg[k].trim());
-            a.target = "_blank";
-            a.rel = "noopener";
-            a.style.setProperty("--c", c);
-            a.textContent = label;
-            tipButtons.appendChild(a);
-          });
-          tipForm.classList.add("hidden");
-          tipEdit.classList.remove("hidden");
-        } else {
-          const p = document.createElement("div");
-          p.className = "tip-empty";
-          p.textContent =
-            "No tip link set yet. Add one below so visitors can support you.";
-          tipButtons.appendChild(p);
-          tipForm.classList.remove("hidden");
-          tipEdit.classList.add("hidden");
-        }
-        // hydrate form fields
-        TIP_PROVIDERS.forEach(([k]) => {
-          document.getElementById(k).value = cfg[k] || "";
-        });
-        document.getElementById("tNote").value = cfg.tNote || "";
-      }
-
-      function openTip() {
-        renderTip();
-        tipOverlay.classList.add("open");
-      }
-      function closeTip() {
+      tipBtn.addEventListener("click", () => tipOverlay.classList.add("open"));
+      document.getElementById("tipClose").addEventListener("click", () => {
         tipOverlay.classList.remove("open");
-      }
-
-      document.getElementById("tipBtn").addEventListener("click", openTip);
-      document.getElementById("tipClose").addEventListener("click", closeTip);
+      });
       tipOverlay.addEventListener("click", (e) => {
-        if (e.target === tipOverlay) closeTip();
-      });
-      tipEdit.addEventListener("click", () => {
-        tipForm.classList.remove("hidden");
-        tipEdit.classList.add("hidden");
-      });
-      tipForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const cfg = {};
-        TIP_PROVIDERS.forEach(([k]) => {
-          const v = document.getElementById(k).value.trim();
-          if (v) cfg[k] = v;
-        });
-        const note = document.getElementById("tNote").value.trim();
-        if (note) cfg.tNote = note;
-        saveTip(cfg);
-        renderTip();
+        if (e.target === tipOverlay) tipOverlay.classList.remove("open");
       });
 
       // ---- search / address bar ----
