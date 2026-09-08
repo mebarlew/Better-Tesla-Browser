@@ -332,6 +332,14 @@
         font-size: 18px;
         font-weight: 600;
         letter-spacing: -0.2px;
+        text-align: center;
+        line-height: 1.2;
+        padding: 0 14px;
+        max-width: 100%;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
       }
 
       .add-tile {
@@ -385,6 +393,30 @@
         to {
           transform: rotate(0.6deg);
         }
+      }
+
+      .fs {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        width: 48px;
+        height: 48px;
+        border-radius: 999px;
+        border: 1px solid var(--panel-brd);
+        background: var(--panel);
+        color: var(--dim);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        transition: transform 0.1s ease;
+      }
+      .fs:active {
+        transform: scale(0.92);
       }
 
       /* overlay */
@@ -542,7 +574,6 @@
           </span>
         </a>
         <div class="actions">
-          <button class="btn" id="fsBtn">⛶ Fullscreen</button>
           <button class="btn tip" id="tipBtn">☕ Tip</button>
           <button class="btn" id="editBtn">Edit</button>
           <button class="btn primary" id="addBtn">+ Add</button>
@@ -563,6 +594,10 @@
 
       <div class="grid" id="grid"></div>
     </div>
+
+    <button class="fs" id="fsBtn" aria-label="Fullscreen" title="Fullscreen">
+      ⛶
+    </button>
 
     <div class="overlay" id="overlay">
       <div class="sheet">
