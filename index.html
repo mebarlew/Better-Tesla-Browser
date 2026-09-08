@@ -69,8 +69,13 @@
         backdrop-filter: blur(8px);
         text-decoration: none;
         color: var(--ink);
-        margin-left: auto;
         transition: transform 0.1s ease;
+      }
+      header > [data-w]:nth-child(2) {
+        margin-left: auto;
+      }
+      body.editing header > [data-w] {
+        cursor: grab;
       }
       .weather:active {
         transform: scale(0.97);
@@ -238,9 +243,11 @@
       .custom.loose-form {
         margin: 0 0 16px;
       }
-      body.editing .tile {
-        touch-action: none;
+      #sections .tile,
+      .section-head,
+      header > [data-w] {
         user-select: none;
+        -webkit-touch-callout: none;
       }
       .placeholder {
         opacity: 0.35;
@@ -550,7 +557,7 @@
   <body>
     <div class="wrap">
       <header>
-        <div class="actions">
+        <div class="actions" data-w="actions">
           <button class="btn" id="chargeBtn">⚡ Chargers in ABRP</button>
           <button class="btn" id="editBtn">Edit</button>
           <button class="btn primary" id="addBtn">+ Add</button>
@@ -558,6 +565,7 @@
         <a
           class="weather"
           id="weather"
+          data-w="weather"
           href="https://www.google.com/search?q=weather"
           title="Weather"
         >
@@ -571,7 +579,7 @@
             <span class="w-hilo" id="wHilo"></span>
           </span>
         </a>
-        <div class="clockbox">
+        <div class="clockbox" data-w="clock">
           <div class="clock" id="clock">--:--</div>
           <div class="greet" id="greet">Ready when you are</div>
         </div>
@@ -880,28 +888,108 @@
         buildCatalog();
       });
 
-      // ---- drag to reorder / move between blocks (edit mode) ----
+      // ---- press-and-hold to move tiles, blocks and header widgets ----
       // Pointer events instead of the HTML5 drag API: Chromium on touch
-      // screens (the car) does not fire drag events reliably.
+      // screens (the car) does not fire drag events reliably. Outside edit
+      // mode a hold arms the drag; moving early cancels it so flicks scroll.
+      const HOLD_MS = 350;
+      const HEADER_KEY = "launcher.header.v1";
+      const header = document.querySelector("header");
       let drag = null;
+      let swallowClicksUntil = 0;
 
-      sections.addEventListener("dragstart", (e) => e.preventDefault());
+      function saveHeader() {
+        localStorage.setItem(
+          HEADER_KEY,
+          JSON.stringify([...header.children].map((w) => w.dataset.w)),
+        );
+      }
+      (function restoreHeader() {
+        let order;
+        try {
+          order = JSON.parse(localStorage.getItem(HEADER_KEY));
+        } catch {
+          order = null;
+        }
+        if (!Array.isArray(order)) return;
+        order.forEach((id) => {
+          const w = header.querySelector('[data-w="' + id + '"]');
+          if (w) header.appendChild(w);
+        });
+      })();
 
-      sections.addEventListener("pointerdown", (e) => {
-        if (!document.body.classList.contains("editing")) return;
-        if (e.target.closest(".remove, .cat-remove")) return;
-        const tile = e.target.closest(".tile:not(.add-tile)");
-        const head = !tile && e.target.closest(".section.cat > .section-head");
-        if (!tile && !head) return;
-        e.preventDefault();
+      function dragTargetFrom(target) {
+        if (target.closest(".remove, .cat-remove, input")) return null;
+        const tile = target.closest("#sections .tile:not(.add-tile)");
+        if (tile) return { el: tile, kind: "tile" };
+        const head = target.closest("#sections .section.cat > .section-head");
+        if (head) return { el: head.parentNode, kind: "block" };
+        const w = target.closest("header > [data-w]");
+        if (w) return { el: w, kind: "widget" };
+        return null;
+      }
+
+      function refindDragEl(d) {
+        if (d.kind === "tile") {
+          return sections.querySelector('.tile[data-i="' + d.key + '"]');
+        }
+        if (d.kind === "block") {
+          return [...sections.querySelectorAll(".section.cat")].find(
+            (s) => s.dataset.cat === d.key,
+          );
+        }
+        return d.el;
+      }
+
+      document.addEventListener("dragstart", (e) => {
+        if (dragTargetFrom(e.target)) e.preventDefault();
+      });
+      document.addEventListener("contextmenu", (e) => {
+        if (dragTargetFrom(e.target)) e.preventDefault();
+      });
+      document.addEventListener(
+        "touchmove",
+        (e) => {
+          if (drag && drag.armed) e.preventDefault();
+        },
+        { passive: false },
+      );
+      document.addEventListener(
+        "click",
+        (e) => {
+          if (performance.now() > swallowClicksUntil) return;
+          e.stopPropagation();
+          e.preventDefault();
+        },
+        true,
+      );
+
+      document.addEventListener("pointerdown", (e) => {
+        const t = dragTargetFrom(e.target);
+        if (!t) return;
+        const editing = document.body.classList.contains("editing");
         drag = {
-          el: tile || head.parentNode,
-          kind: tile ? "tile" : "block",
+          el: t.el,
+          kind: t.kind,
+          key: t.kind === "tile" ? t.el.dataset.i : t.el.dataset.cat,
           id: e.pointerId,
           x: e.clientX,
           y: e.clientY,
           ghost: null,
+          armed: editing,
+          wasEditing: editing,
+          timer: 0,
         };
+        if (editing) {
+          e.preventDefault();
+          return;
+        }
+        drag.timer = setTimeout(() => {
+          if (!drag) return;
+          drag.armed = true;
+          setEditing(true);
+          drag.el = refindDragEl(drag);
+        }, HOLD_MS);
       });
 
       function clearDrop() {
@@ -914,6 +1002,13 @@
         if (!drag || e.pointerId !== drag.id) return;
         const dx = e.clientX - drag.x;
         const dy = e.clientY - drag.y;
+        if (!drag.armed) {
+          if (Math.hypot(dx, dy) >= 10) {
+            clearTimeout(drag.timer);
+            drag = null;
+          }
+          return;
+        }
         if (!drag.ghost) {
           if (Math.hypot(dx, dy) < 10) return;
           const r = drag.el.getBoundingClientRect();
@@ -933,12 +1028,21 @@
           "px," +
           dy +
           "px) scale(" +
-          (drag.kind === "block" ? 1.02 : 1.06) +
+          (drag.kind === "tile" ? 1.06 : 1.02) +
           ")";
 
         const el = document.elementFromPoint(e.clientX, e.clientY);
         clearDrop();
         if (!el) return;
+
+        if (drag.kind === "widget") {
+          const over = el.closest("header > [data-w]");
+          if (!over || over === drag.el) return;
+          const r = over.getBoundingClientRect();
+          const before = e.clientX < r.left + r.width / 2;
+          header.insertBefore(drag.el, before ? over : over.nextSibling);
+          return;
+        }
 
         if (drag.kind === "block") {
           const over = el.closest("#sections .section.cat");
@@ -967,14 +1071,20 @@
         if (!drag || e.pointerId !== drag.id) return;
         const d = drag;
         drag = null;
+        clearTimeout(d.timer);
         clearDrop();
         if (!d.ghost) {
-          if (d.kind === "tile" && e.type === "pointerup")
+          if (d.kind === "tile" && d.wasEditing && e.type === "pointerup")
             openMove(Number(d.el.dataset.i));
           return;
         }
+        swallowClicksUntil = performance.now() + 400;
         d.ghost.remove();
         d.el.classList.remove("placeholder");
+        if (d.kind === "widget") {
+          saveHeader();
+          return;
+        }
         if (d.kind === "block") {
           cats = [...sections.querySelectorAll(".section.cat")].map(
             (s) => s.dataset.cat,
@@ -1161,11 +1271,17 @@
       });
 
       const editBtn = document.getElementById("editBtn");
-      editBtn.addEventListener("click", () => {
-        const on = document.body.classList.toggle("editing");
+      function setEditing(on) {
+        document.body.classList.toggle("editing", on);
         editBtn.textContent = on ? "Done" : "Edit";
         editBtn.classList.toggle("on", on);
         render();
+      }
+      editBtn.addEventListener("click", () => {
+        setEditing(!document.body.classList.contains("editing"));
+      });
+      document.getElementById("weather").addEventListener("click", (e) => {
+        if (document.body.classList.contains("editing")) e.preventDefault();
       });
 
       // ---- search / address bar ----
