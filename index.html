@@ -551,6 +551,7 @@
           </span>
         </a>
         <div class="actions">
+          <button class="btn" id="chargeBtn">⚡ Chargers in ABRP</button>
           <button class="btn" id="editBtn">Edit</button>
           <button class="btn primary" id="addBtn">+ Add</button>
         </div>
@@ -1277,6 +1278,23 @@
         const c = JSON.parse(localStorage.getItem(WEATHER_LOC) || "null");
         if (c) loadWeatherAt(c.lat, c.lon);
       }, 900000); // refresh every 15 min
+
+      // ---- nearby chargers: open ABRP centred on the car ----
+      // ABRP's deep link only centres the map; it cannot start navigation.
+      const ABRP = "https://abetterrouteplanner.com/";
+      document.getElementById("chargeBtn").addEventListener("click", () => {
+        const go = (lat, lon) => {
+          window.location.href = ABRP + "?lat=" + lat + "&lon=" + lon;
+        };
+        const cached = JSON.parse(localStorage.getItem(WEATHER_LOC) || "null");
+        if (cached) return go(cached.lat, cached.lon);
+        if (!navigator.geolocation) return (window.location.href = ABRP);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => go(pos.coords.latitude, pos.coords.longitude),
+          () => (window.location.href = ABRP),
+          { timeout: 8000, maximumAge: 600000 },
+        );
+      });
 
       render();
     </script>
