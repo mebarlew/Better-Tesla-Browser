@@ -198,11 +198,6 @@
         color: #111;
         border-color: transparent;
       }
-      .btn.tip {
-        background: rgba(255, 199, 44, 0.14);
-        border-color: rgba(255, 199, 44, 0.4);
-        color: #ffd666;
-      }
 
       .tip-buttons {
         display: flex;
@@ -395,16 +390,15 @@
         }
       }
 
-      .fs {
+      .tipjar {
         position: fixed;
         right: 24px;
         bottom: 24px;
         width: 48px;
         height: 48px;
         border-radius: 999px;
-        border: 1px solid var(--panel-brd);
-        background: var(--panel);
-        color: var(--dim);
+        border: 1px solid rgba(255, 199, 44, 0.4);
+        background: rgba(255, 199, 44, 0.14);
         font-size: 22px;
         line-height: 1;
         cursor: pointer;
@@ -415,7 +409,7 @@
         z-index: 10;
         transition: transform 0.1s ease;
       }
-      .fs:active {
+      .tipjar:active {
         transform: scale(0.92);
       }
 
@@ -574,7 +568,6 @@
           </span>
         </a>
         <div class="actions">
-          <button class="btn tip" id="tipBtn">☕ Tip</button>
           <button class="btn" id="editBtn">Edit</button>
           <button class="btn primary" id="addBtn">+ Add</button>
         </div>
@@ -595,8 +588,8 @@
       <div class="grid" id="grid"></div>
     </div>
 
-    <button class="fs" id="fsBtn" aria-label="Fullscreen" title="Fullscreen">
-      ⛶
+    <button class="tipjar" id="tipBtn" aria-label="Tip jar" title="Tip jar">
+      ☕
     </button>
 
     <div class="overlay" id="overlay">
@@ -921,15 +914,6 @@
         const on = document.body.classList.toggle("editing");
         editBtn.textContent = on ? "Done" : "Edit";
         editBtn.classList.toggle("on", on);
-      });
-
-      // ---- fullscreen ----
-      // Tesla's browser ignores the Fullscreen API, but its YouTube "theater"
-      // window is fullscreen and youtube.com/redirect loads any site inside it.
-      document.getElementById("fsBtn").addEventListener("click", () => {
-        window.location.href =
-          "https://www.youtube.com/redirect?q=" +
-          encodeURIComponent(window.location.href);
       });
 
       // ---- tip jar ----
