@@ -277,16 +277,12 @@
         outline: 2px dashed var(--accent);
         outline-offset: 10px;
       }
-      .new-sec {
-        display: none;
+      body.editing .section.loose {
         padding: 22px;
         border: 1px dashed rgba(255, 255, 255, 0.16);
       }
-      body.editing .new-sec {
-        display: block;
-      }
-      .new-sec .custom {
-        margin: 0;
+      .custom.loose-form {
+        margin: 0 0 16px;
       }
       body.editing .tile {
         touch-action: none;
@@ -405,10 +401,14 @@
       }
 
       .add-tile {
+        display: none;
         border-style: dashed;
         border-color: rgba(255, 255, 255, 0.16);
         background: transparent;
         cursor: pointer;
+      }
+      body.editing .add-tile {
+        display: flex;
       }
       .add-tile .plus {
         font-size: 46px;
@@ -656,12 +656,6 @@
       </form>
 
       <div id="sections"></div>
-      <div class="section new-sec">
-        <form class="custom" id="homeNewCatForm">
-          <input id="homeNewCat" placeholder="New category name…" />
-          <button type="submit" class="btn primary">Create</button>
-        </form>
-      </div>
     </div>
 
     <button class="tipjar" id="tipBtn" aria-label="Tip jar" title="Tip jar">
@@ -935,11 +929,31 @@
         sections.innerHTML = "";
         const indexed = tiles.map((t, i) => [t, i]);
         const loose = indexed.filter(([t]) => !catOf(t));
-        const top = document.createElement("section");
-        top.className = "section";
-        top.dataset.cat = "";
-        top.appendChild(makeGrid(loose, ""));
-        sections.appendChild(top);
+        const editing = document.body.classList.contains("editing");
+        if (loose.length || editing) {
+          const top = document.createElement("section");
+          top.className = "section loose";
+          top.dataset.cat = "";
+          if (editing) {
+            const form = document.createElement("form");
+            form.className = "custom loose-form";
+            form.innerHTML =
+              '<input placeholder="' +
+              (loose.length ? "Name this block…" : "New category name…") +
+              '" /><button type="submit" class="btn primary">Create</button>';
+            form.addEventListener("submit", (e) => {
+              e.preventDefault();
+              const name = form.querySelector("input").value.trim();
+              if (!createCat(name)) return;
+              loose.forEach(([t]) => (t.cat = name));
+              save(tiles);
+              render();
+            });
+            top.appendChild(form);
+          }
+          top.appendChild(makeGrid(loose, ""));
+          sections.appendChild(top);
+        }
         cats.forEach((cat) => {
           const s = document.createElement("section");
           s.className = "section cat";
@@ -1187,7 +1201,6 @@
         if (!name || cats.includes(name)) return false;
         cats.push(name);
         saveCats();
-        render();
         return true;
       }
 
@@ -1198,15 +1211,8 @@
         inp.value = "";
         newCatRow.hidden = true;
         buildCatPick();
+        render();
       });
-
-      document
-        .getElementById("homeNewCatForm")
-        .addEventListener("submit", (e) => {
-          e.preventDefault();
-          const inp = document.getElementById("homeNewCat");
-          if (createCat(inp.value)) inp.value = "";
-        });
 
       function openSheet(cat) {
         sheetCat = cat;
@@ -1241,6 +1247,7 @@
         const on = document.body.classList.toggle("editing");
         editBtn.textContent = on ? "Done" : "Edit";
         editBtn.classList.toggle("on", on);
+        render();
       });
 
       // ---- tip jar ----
