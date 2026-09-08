@@ -78,7 +78,7 @@
         cursor: grab;
       }
       .weather:active {
-        transform: scale(0.97);
+        background: rgba(255, 255, 255, 0.08);
       }
       .w-icon {
         font-size: 44px;
@@ -258,8 +258,9 @@
       .placeholder {
         opacity: 0.35;
       }
-      body.editing .ghost {
-        animation: none;
+      body > .ghost {
+        transition: none;
+        backdrop-filter: none;
         opacity: 0.95;
         box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
       }
@@ -319,13 +320,10 @@
         text-decoration: none;
         color: var(--ink);
         overflow: hidden;
-        transition:
-          transform 0.12s ease,
-          background 0.2s ease;
+        transition: background 0.2s ease;
         backdrop-filter: blur(8px);
       }
       .tile:active {
-        transform: scale(0.955);
         background: rgba(255, 255, 255, 0.09);
       }
       .tile .glow {
@@ -415,19 +413,8 @@
       body.editing .remove {
         display: flex;
       }
-      body.editing .tile {
-        animation: wiggle 0.3s ease-in-out infinite alternate;
-      }
-      body.editing .add-tile {
-        animation: none;
-      }
-      @keyframes wiggle {
-        from {
-          transform: rotate(-0.6deg);
-        }
-        to {
-          transform: rotate(0.6deg);
-        }
+      body.editing .tile:not(.add-tile) {
+        border-color: rgba(255, 255, 255, 0.22);
       }
 
       /* overlay */
