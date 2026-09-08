@@ -54,7 +54,7 @@
       header {
         display: flex;
         align-items: flex-start;
-        justify-content: space-between;
+        justify-content: flex-end;
         gap: 24px;
         flex-wrap: wrap;
       }
@@ -116,6 +116,9 @@
       }
       .weather.err .w-side {
         display: none;
+      }
+      .clockbox {
+        text-align: right;
       }
       .clock {
         font-size: 76px;
@@ -200,14 +203,29 @@
         border-color: transparent;
       }
 
-      .section {
+      #sections {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 24px;
         margin-top: 40px;
+      }
+      .section {
         border-radius: 30px;
       }
+      .section.loose {
+        flex: 1 1 100%;
+      }
       .section.cat {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 100%;
         padding: 22px;
         background: rgba(255, 255, 255, 0.025);
         border: 1px solid var(--panel-brd);
+      }
+      body.editing .section.cat > .section-head {
+        cursor: grab;
       }
       .section.drop {
         outline: 2px dashed var(--accent);
@@ -224,10 +242,10 @@
         touch-action: none;
         user-select: none;
       }
-      .tile.placeholder {
+      .placeholder {
         opacity: 0.35;
       }
-      body.editing .tile.ghost {
+      body.editing .ghost {
         position: fixed;
         margin: 0;
         z-index: 40;
@@ -264,8 +282,8 @@
         display: flex;
       }
       .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
+        display: flex;
+        flex-wrap: wrap;
         gap: 20px;
       }
       .tile {
@@ -275,7 +293,9 @@
         align-items: center;
         justify-content: center;
         gap: 15px;
+        width: var(--tile);
         height: var(--tile);
+        flex-shrink: 0;
         border-radius: 26px;
         background: var(--panel);
         border: 1px solid var(--panel-brd);
@@ -530,9 +550,10 @@
   <body>
     <div class="wrap">
       <header>
-        <div>
-          <div class="clock" id="clock">--:--</div>
-          <div class="greet" id="greet">Ready when you are</div>
+        <div class="actions">
+          <button class="btn" id="chargeBtn">⚡ Chargers in ABRP</button>
+          <button class="btn" id="editBtn">Edit</button>
+          <button class="btn primary" id="addBtn">+ Add</button>
         </div>
         <a
           class="weather"
@@ -550,10 +571,9 @@
             <span class="w-hilo" id="wHilo"></span>
           </span>
         </a>
-        <div class="actions">
-          <button class="btn" id="chargeBtn">⚡ Chargers in ABRP</button>
-          <button class="btn" id="editBtn">Edit</button>
-          <button class="btn primary" id="addBtn">+ Add</button>
+        <div class="clockbox">
+          <div class="clock" id="clock">--:--</div>
+          <div class="greet" id="greet">Ready when you are</div>
         </div>
       </header>
 
@@ -869,11 +889,14 @@
 
       sections.addEventListener("pointerdown", (e) => {
         if (!document.body.classList.contains("editing")) return;
+        if (e.target.closest(".remove, .cat-remove")) return;
         const tile = e.target.closest(".tile:not(.add-tile)");
-        if (!tile || e.target.closest(".remove")) return;
+        const head = !tile && e.target.closest(".section.cat > .section-head");
+        if (!tile && !head) return;
         e.preventDefault();
         drag = {
-          tile,
+          el: tile || head.parentNode,
+          kind: tile ? "tile" : "block",
           id: e.pointerId,
           x: e.clientX,
           y: e.clientY,
@@ -893,8 +916,8 @@
         const dy = e.clientY - drag.y;
         if (!drag.ghost) {
           if (Math.hypot(dx, dy) < 10) return;
-          const r = drag.tile.getBoundingClientRect();
-          const g = drag.tile.cloneNode(true);
+          const r = drag.el.getBoundingClientRect();
+          const g = drag.el.cloneNode(true);
           g.classList.add("ghost");
           g.style.left = r.left + "px";
           g.style.top = r.top + "px";
@@ -902,24 +925,41 @@
           g.style.height = r.height + "px";
           document.body.appendChild(g);
           drag.ghost = g;
-          drag.tile.classList.add("placeholder");
+          drag.el.classList.add("placeholder");
         }
         drag.ghost.style.transform =
-          "translate(" + dx + "px," + dy + "px) scale(1.06)";
+          "translate(" +
+          dx +
+          "px," +
+          dy +
+          "px) scale(" +
+          (drag.kind === "block" ? 1.02 : 1.06) +
+          ")";
 
         const el = document.elementFromPoint(e.clientX, e.clientY);
-        const sec = el && el.closest("#sections .section");
         clearDrop();
+        if (!el) return;
+
+        if (drag.kind === "block") {
+          const over = el.closest("#sections .section.cat");
+          if (!over || over === drag.el) return;
+          const r = over.getBoundingClientRect();
+          const before = e.clientX < r.left + r.width / 2;
+          sections.insertBefore(drag.el, before ? over : over.nextSibling);
+          return;
+        }
+
+        const sec = el.closest("#sections .section");
         if (!sec) return;
         sec.classList.add("drop");
         const grid = sec.querySelector(".grid");
         const over = el.closest(".tile:not(.add-tile)");
-        if (over && over !== drag.tile) {
+        if (over && over !== drag.el) {
           const r = over.getBoundingClientRect();
           const before = e.clientX < r.left + r.width / 2;
-          grid.insertBefore(drag.tile, before ? over : over.nextSibling);
-        } else if (!over && drag.tile.parentNode !== grid) {
-          grid.insertBefore(drag.tile, grid.querySelector(".add-tile"));
+          grid.insertBefore(drag.el, before ? over : over.nextSibling);
+        } else if (!over && drag.el.parentNode !== grid) {
+          grid.insertBefore(drag.el, grid.querySelector(".add-tile"));
         }
       });
 
@@ -929,11 +969,20 @@
         drag = null;
         clearDrop();
         if (!d.ghost) {
-          if (e.type === "pointerup") openMove(Number(d.tile.dataset.i));
+          if (d.kind === "tile" && e.type === "pointerup")
+            openMove(Number(d.el.dataset.i));
           return;
         }
         d.ghost.remove();
-        d.tile.classList.remove("placeholder");
+        d.el.classList.remove("placeholder");
+        if (d.kind === "block") {
+          cats = [...sections.querySelectorAll(".section.cat")].map(
+            (s) => s.dataset.cat,
+          );
+          saveCats();
+          render();
+          return;
+        }
         const order = [];
         sections.querySelectorAll(".section").forEach((s) => {
           s.querySelectorAll(".tile:not(.add-tile)").forEach((el) => {
