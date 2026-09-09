@@ -538,15 +538,103 @@
         font-weight: 800;
       }
 
+      /* Tesla's browser pane is roughly half the screen: keep the header to
+         one row and tighten everything so the first tile row is visible. */
       @media (max-width: 900px) {
         :root {
-          --tile: 132px;
+          --tile: 120px;
         }
         .wrap {
-          padding: 28px 22px 80px;
+          padding: 14px 16px 60px;
+        }
+        header {
+          gap: 12px;
+          align-items: center;
+        }
+        .actions {
+          gap: 8px;
+        }
+        .btn {
+          font-size: 15px;
+          padding: 10px 16px;
         }
         .clock {
-          font-size: 52px;
+          font-size: 34px;
+          letter-spacing: -1px;
+        }
+        .greet {
+          display: none;
+        }
+        .weather {
+          padding: 8px 14px;
+          gap: 10px;
+          border-radius: 16px;
+        }
+        .w-icon {
+          font-size: 28px;
+        }
+        .w-temp {
+          font-size: 22px;
+        }
+        .w-cond,
+        .w-side {
+          display: none;
+        }
+        .search {
+          margin-top: 14px;
+          padding: 6px 6px 6px 18px;
+        }
+        .search-ico {
+          font-size: 22px;
+        }
+        .search input {
+          font-size: 17px;
+          padding: 8px 0;
+        }
+        .search .go {
+          padding: 10px 20px;
+          font-size: 15px;
+        }
+        #sections {
+          gap: 14px;
+          margin-top: 18px;
+        }
+        .section {
+          border-radius: 22px;
+        }
+        .section.cat,
+        body.editing .section.loose {
+          padding: 14px;
+        }
+        .section-head {
+          margin-bottom: 10px;
+        }
+        .tiles,
+        .grid {
+          gap: 14px;
+        }
+        .tile {
+          border-radius: 20px;
+          gap: 10px;
+        }
+        .badge {
+          width: 56px;
+          height: 56px;
+          border-radius: 15px;
+          font-size: 24px;
+        }
+        .badge img {
+          width: 36px;
+          height: 36px;
+        }
+        .name {
+          font-size: 15px;
+          padding: 0 10px;
+        }
+        .remove {
+          width: 28px;
+          height: 28px;
+          font-size: 17px;
         }
       }
     </style>
